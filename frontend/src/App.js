@@ -401,15 +401,273 @@ const App = () => {
     </div>
   );
 
-  const InventoryPage = () => (
-    <div className="bg-white/90 backdrop-blur-sm rounded-lg shadow-lg p-6 m-4">
-      <h2 className="text-2xl font-bold text-gray-800 mb-4 text-right">إدارة المخزون</h2>
-      <div className="text-center text-gray-600 py-12">
-        <div className="text-6xl mb-4">📦</div>
-        <p className="text-xl">جاري تحضير واجهة المخزون...</p>
+  const InventoryPage = () => {
+    
+    // Add new inventory item
+    const addInventoryItem = () => {
+      if (!newItem.name.trim() || !newItem.price) {
+        alert('يرجى إدخال اسم الصنف والسعر');
+        return;
+      }
+
+      const newInventoryItem = {
+        id: Date.now().toString(),
+        name: newItem.name.trim(),
+        price: parseFloat(newItem.price),
+        createdAt: new Date()
+      };
+
+      setInventory(prev => [...prev, newInventoryItem]);
+      setNewItem({ name: '', price: '' });
+      alert('تم إضافة الصنف بنجاح!');
+    };
+
+    // Delete inventory item (with password protection)
+    const deleteInventoryItem = (itemId) => {
+      setShowPasswordModal({
+        show: true,
+        action: 'delete',
+        item: itemId
+      });
+    };
+
+    // Edit inventory item (with password protection)
+    const editInventoryItem = (item) => {
+      setShowPasswordModal({
+        show: true,
+        action: 'edit',
+        item: item
+      });
+    };
+
+    // Password verification and action execution
+    const handlePasswordAction = (enteredPassword) => {
+      if (enteredPassword !== settings.deletePassword) {
+        alert('كلمة المرور غير صحيحة!');
+        return;
+      }
+
+      if (showPasswordModal.action === 'delete') {
+        setInventory(prev => prev.filter(item => item.id !== showPasswordModal.item));
+        alert('تم حذف الصنف بنجاح!');
+      } else if (showPasswordModal.action === 'edit') {
+        setEditingItem(showPasswordModal.item);
+      }
+
+      setShowPasswordModal({ show: false, action: '', item: null });
+    };
+
+    // Update edited item
+    const updateInventoryItem = () => {
+      if (!editingItem.name.trim() || !editingItem.price) {
+        alert('يرجى إدخال اسم الصنف والسعر');
+        return;
+      }
+
+      setInventory(prev => prev.map(item => 
+        item.id === editingItem.id ? editingItem : item
+      ));
+      setEditingItem(null);
+      alert('تم تحديث الصنف بنجاح!');
+    };
+
+    return (
+      <div className="bg-white/90 backdrop-blur-sm rounded-lg shadow-lg p-6 m-4">
+        <h2 className="text-2xl font-bold text-gray-800 mb-6 text-right">إدارة المخزون</h2>
+        
+        {/* Add New Item Section */}
+        <div className="bg-blue-50 rounded-lg p-6 mb-6">
+          <h3 className="text-lg font-semibold text-gray-700 mb-4 text-right">إضافة صنف جديد</h3>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Item Name Input */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2 text-right">اسم الصنف</label>
+              <input
+                type="text"
+                value={newItem.name}
+                onChange={(e) => setNewItem(prev => ({ ...prev, name: e.target.value }))}
+                className="w-full p-3 border border-gray-300 rounded-md text-right"
+                placeholder="أدخل اسم الصنف"
+              />
+            </div>
+
+            {/* Price Input */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2 text-right">السعر ({settings.currency})</label>
+              <input
+                type="number"
+                step="0.1"
+                value={newItem.price}
+                onChange={(e) => setNewItem(prev => ({ ...prev, price: e.target.value }))}
+                className="w-full p-3 border border-gray-300 rounded-md text-right"
+                placeholder="0.00"
+              />
+            </div>
+
+            {/* Add Button */}
+            <div className="flex items-end">
+              <button
+                onClick={addInventoryItem}
+                className="w-full py-3 bg-green-500 text-white rounded-md hover:bg-green-600 font-semibold"
+              >
+                ➕ إضافة صنف
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Inventory Table */}
+        <div className="bg-white rounded-lg shadow-sm border">
+          <div className="px-6 py-4 bg-gray-50 border-b">
+            <h3 className="text-lg font-semibold text-gray-800 text-right">قائمة الأصناف</h3>
+          </div>
+
+          {inventory.length === 0 ? (
+            <div className="text-center py-12 text-gray-500">
+              <div className="text-4xl mb-4">📦</div>
+              <p className="text-lg">لا توجد أصناف مضافة بعد</p>
+              <p className="text-sm">أضف أول صنف للمخزون</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-100">
+                  <tr>
+                    <th className="px-6 py-3 text-right text-sm font-semibold text-gray-700">الإجراءات</th>
+                    <th className="px-6 py-3 text-right text-sm font-semibold text-gray-700">السعر</th>
+                    <th className="px-6 py-3 text-right text-sm font-semibold text-gray-700">اسم الصنف</th>
+                    <th className="px-6 py-3 text-right text-sm font-semibold text-gray-700">#</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {inventory.map((item, index) => (
+                    <tr key={item.id} className="border-b hover:bg-gray-50">
+                      <td className="px-6 py-4">
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => editInventoryItem(item)}
+                            className="px-3 py-1 bg-blue-500 text-white rounded text-sm hover:bg-blue-600"
+                          >
+                            ✏️ تعديل
+                          </button>
+                          <button
+                            onClick={() => deleteInventoryItem(item.id)}
+                            className="px-3 py-1 bg-red-500 text-white rounded text-sm hover:bg-red-600"
+                          >
+                            🗑️ حذف
+                          </button>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <span className="font-semibold text-green-600">
+                          {item.price.toFixed(2)} {settings.currency}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-right font-medium">{item.name}</td>
+                      <td className="px-6 py-4 text-right text-gray-500">{index + 1}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {/* Password Modal */}
+        {showPasswordModal.show && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 w-96">
+              <h3 className="text-lg font-bold text-center mb-4">
+                🔒 تأكيد {showPasswordModal.action === 'delete' ? 'الحذف' : 'التعديل'}
+              </h3>
+              
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2 text-right">كلمة المرور</label>
+                <input
+                  type="password"
+                  id="passwordInput"
+                  className="w-full p-3 border border-gray-300 rounded-md text-right"
+                  placeholder="أدخل كلمة المرور"
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter') {
+                      const password = e.target.value;
+                      handlePasswordAction(password);
+                      e.target.value = '';
+                    }
+                  }}
+                />
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    const password = document.getElementById('passwordInput').value;
+                    handlePasswordAction(password);
+                    document.getElementById('passwordInput').value = '';
+                  }}
+                  className="flex-1 py-2 bg-green-500 text-white rounded-md hover:bg-green-600"
+                >
+                  ✅ تأكيد
+                </button>
+                <button
+                  onClick={() => setShowPasswordModal({ show: false, action: '', item: null })}
+                  className="flex-1 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
+                >
+                  إلغاء
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Edit Modal */}
+        {editingItem && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 w-96">
+              <h3 className="text-lg font-bold text-center mb-4">✏️ تعديل الصنف</h3>
+              
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2 text-right">اسم الصنف</label>
+                <input
+                  type="text"
+                  value={editingItem.name}
+                  onChange={(e) => setEditingItem(prev => ({ ...prev, name: e.target.value }))}
+                  className="w-full p-3 border border-gray-300 rounded-md text-right"
+                />
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2 text-right">السعر ({settings.currency})</label>
+                <input
+                  type="number"
+                  step="0.1"
+                  value={editingItem.price}
+                  onChange={(e) => setEditingItem(prev => ({ ...prev, price: parseFloat(e.target.value) || 0 }))}
+                  className="w-full p-3 border border-gray-300 rounded-md text-right"
+                />
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={updateInventoryItem}
+                  className="flex-1 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
+                >
+                  💾 حفظ التغييرات
+                </button>
+                <button
+                  onClick={() => setEditingItem(null)}
+                  className="flex-1 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
+                >
+                  إلغاء
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
-    </div>
-  );
+    );
+  };
 
   const WithdrawalsPage = () => (
     <div className="bg-white/90 backdrop-blur-sm rounded-lg shadow-lg p-6 m-4">
