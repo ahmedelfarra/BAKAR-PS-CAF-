@@ -1186,12 +1186,10 @@ const App = () => {
 
   const WithdrawalsPage = () => {
     
-    // Withdrawals state
+    // Withdrawals local state
     const [withdrawalAmount, setWithdrawalAmount] = useState('');
     const [withdrawalDescription, setWithdrawalDescription] = useState('');
     const [withdrawalType, setWithdrawalType] = useState('');
-    const [withdrawals, setWithdrawals] = useState([]);
-    const [withdrawalDebts, setWithdrawalDebts] = useState([]); // شكك السحوبات
 
     const withdrawalTypes = [
       { value: 'debt', label: 'مديونية' },
@@ -1346,8 +1344,21 @@ const App = () => {
               <div className="max-h-96 overflow-y-auto">
                 {withdrawals.map((withdrawal) => (
                   <div key={withdrawal.id} className="p-4 border-b hover:bg-gray-50">
-                    <div className="flex justify-between items-start">
-                      <div className="text-right flex-1">
+                    <div className="flex justify-between items-center">
+                      <button
+                        onClick={() => {
+                          setShowPasswordModal({
+                            show: true,
+                            action: 'delete_withdrawal',
+                            item: withdrawal.id
+                          });
+                        }}
+                        className="px-2 py-1 bg-red-500 text-white rounded text-xs hover:bg-red-600"
+                      >
+                        🗑️ حذف
+                      </button>
+                      
+                      <div className="text-right flex-1 mx-3">
                         <div className="font-semibold text-gray-800">
                           {withdrawalTypes.find(type => type.value === withdrawal.type)?.label}
                         </div>
@@ -1356,6 +1367,7 @@ const App = () => {
                           {withdrawal.date.toLocaleString('ar-EG')}
                         </div>
                       </div>
+                      
                       <div className="text-left">
                         <span className={`font-bold text-lg ${
                           withdrawal.type === 'collection' ? 'text-green-600' : 'text-red-600'
@@ -1428,6 +1440,63 @@ const App = () => {
             </div>
           </div>
         </div>
+
+        {/* Password Modal for Withdrawal Deletion */}
+        {showPasswordModal.show && showPasswordModal.action === 'delete_withdrawal' && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 w-96">
+              <h3 className="text-lg font-bold text-center mb-4">🔒 تأكيد حذف العملية</h3>
+              
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2 text-right">كلمة المرور</label>
+                <input
+                  type="password"
+                  id="withdrawalPasswordInput"
+                  className="w-full p-3 border border-gray-300 rounded-md text-right"
+                  placeholder="أدخل كلمة المرور"
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter') {
+                      const password = e.target.value;
+                      if (password === settings.deletePassword) {
+                        setWithdrawals(prev => prev.filter(w => w.id !== showPasswordModal.item));
+                        alert('تم حذف العملية بنجاح!');
+                      } else {
+                        alert('كلمة المرور غير صحيحة!');
+                      }
+                      setShowPasswordModal({ show: false, action: '', item: null });
+                      e.target.value = '';
+                    }
+                  }}
+                />
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    const password = document.getElementById('withdrawalPasswordInput').value;
+                    if (password === settings.deletePassword) {
+                      setWithdrawals(prev => prev.filter(w => w.id !== showPasswordModal.item));
+                      alert('تم حذف العملية بنجاح!');
+                    } else {
+                      alert('كلمة المرور غير صحيحة!');
+                    }
+                    setShowPasswordModal({ show: false, action: '', item: null });
+                    document.getElementById('withdrawalPasswordInput').value = '';
+                  }}
+                  className="flex-1 py-2 bg-red-500 text-white rounded-md hover:bg-red-600"
+                >
+                  ✅ تأكيد الحذف
+                </button>
+                <button
+                  onClick={() => setShowPasswordModal({ show: false, action: '', item: null })}
+                  className="flex-1 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
+                >
+                  إلغاء
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   };
