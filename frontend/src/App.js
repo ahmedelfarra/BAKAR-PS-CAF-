@@ -22,6 +22,24 @@ const App = () => {
     ps3: { name: 'PS 3', isRoom: false, ...getInitialDeviceState() }
   });
 
+  // Inventory state management
+  const [inventory, setInventory] = useState([]);
+  const [newItem, setNewItem] = useState({ name: '', price: '' });
+  const [editingItem, setEditingItem] = useState(null);
+  const [showPasswordModal, setShowPasswordModal] = useState({ show: false, action: '', item: null });
+  
+  // Settings state (للباسورد)
+  const [settings, setSettings] = useState({
+    deletePassword: '1234', // default password
+    currency: 'ج.م'
+  });
+
+  // Cafe state management  
+  const [customers, setCustomers] = useState([]);
+  const [newCustomerName, setNewCustomerName] = useState('');
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [debts, setDebts] = useState([]); // شكك العملاء
+
   function getInitialDeviceState() {
     return {
       usageType: '',
