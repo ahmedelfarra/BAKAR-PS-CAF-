@@ -40,6 +40,10 @@ const App = () => {
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [debts, setDebts] = useState([]); // شكك العملاء
 
+  // Withdrawals state management
+  const [withdrawals, setWithdrawals] = useState([]);
+  const [withdrawalDebts, setWithdrawalDebts] = useState([]); // شكك السحوبات
+
   function getInitialDeviceState() {
     return {
       usageType: '',
