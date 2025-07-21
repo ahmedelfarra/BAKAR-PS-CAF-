@@ -391,15 +391,526 @@ const App = () => {
     </div>
   );
 
-  const CafePage = () => (
-    <div className="bg-white/90 backdrop-blur-sm rounded-lg shadow-lg p-6 m-4">
-      <h2 className="text-2xl font-bold text-gray-800 mb-4 text-right">إدارة الكافيه</h2>
-      <div className="text-center text-gray-600 py-12">
-        <div className="text-6xl mb-4">☕</div>
-        <p className="text-xl">جاري تحضير واجهة الكافيه...</p>
+  const CafePage = () => {
+    
+    // Add new customer
+    const addCustomer = () => {
+      if (!newCustomerName.trim()) {
+        alert('يرجى إدخال اسم العميل');
+        return;
+      }
+
+      const newCustomer = {
+        id: Date.now().toString(),
+        name: newCustomerName.trim(),
+        invoice: [],
+        totalAmount: 0,
+        discount: 0,
+        paidAmount: 0,
+        remainingAmount: 0,
+        createdAt: new Date()
+      };
+
+      setCustomers(prev => [...prev, newCustomer]);
+      setSelectedCustomer(newCustomer);
+      setNewCustomerName('');
+    };
+
+    // Add item to customer invoice
+    const addItemToInvoice = (customerId, itemId) => {
+      const item = inventory.find(inv => inv.id === itemId);
+      if (!item) return;
+
+      setCustomers(prev => prev.map(customer => {
+        if (customer.id === customerId) {
+          const existingItemIndex = customer.invoice.findIndex(invItem => invItem.id === item.id);
+          
+          if (existingItemIndex >= 0) {
+            // Item exists, increase quantity
+            const updatedInvoice = [...customer.invoice];
+            updatedInvoice[existingItemIndex].quantity += 1;
+            updatedInvoice[existingItemIndex].totalPrice = updatedInvoice[existingItemIndex].quantity * item.price;
+            
+            const newTotalAmount = updatedInvoice.reduce((sum, invItem) => sum + invItem.totalPrice, 0);
+            const newRemainingAmount = newTotalAmount - customer.discount - customer.paidAmount;
+            
+            return {
+              ...customer,
+              invoice: updatedInvoice,
+              totalAmount: newTotalAmount,
+              remainingAmount: newRemainingAmount
+            };
+          } else {
+            // New item, add to invoice
+            const newInvoiceItem = {
+              id: item.id,
+              name: item.name,
+              price: item.price,
+              quantity: 1,
+              totalPrice: item.price
+            };
+            
+            const updatedInvoice = [...customer.invoice, newInvoiceItem];
+            const newTotalAmount = updatedInvoice.reduce((sum, invItem) => sum + invItem.totalPrice, 0);
+            const newRemainingAmount = newTotalAmount - customer.discount - customer.paidAmount;
+            
+            return {
+              ...customer,
+              invoice: updatedInvoice,
+              totalAmount: newTotalAmount,
+              remainingAmount: newRemainingAmount
+            };
+          }
+        }
+        return customer;
+      }));
+
+      // Update selected customer
+      if (selectedCustomer && selectedCustomer.id === customerId) {
+        setSelectedCustomer(prev => {
+          const updated = customers.find(c => c.id === customerId);
+          return updated || prev;
+        });
+      }
+    };
+
+    // Remove item from invoice
+    const removeItemFromInvoice = (customerId, itemId) => {
+      setCustomers(prev => prev.map(customer => {
+        if (customer.id === customerId) {
+          const updatedInvoice = customer.invoice.filter(item => item.id !== itemId);
+          const newTotalAmount = updatedInvoice.reduce((sum, invItem) => sum + invItem.totalPrice, 0);
+          const newRemainingAmount = newTotalAmount - customer.discount - customer.paidAmount;
+          
+          return {
+            ...customer,
+            invoice: updatedInvoice,
+            totalAmount: newTotalAmount,
+            remainingAmount: newRemainingAmount
+          };
+        }
+        return customer;
+      }));
+
+      // Update selected customer
+      if (selectedCustomer && selectedCustomer.id === customerId) {
+        const updatedCustomer = customers.find(c => c.id === customerId);
+        if (updatedCustomer) {
+          setSelectedCustomer(updatedCustomer);
+        }
+      }
+    };
+
+    // Calculate customer bill
+    const calculateCustomerBill = (customer, discount, paidAmount) => {
+      const totalAfterDiscount = customer.totalAmount - parseFloat(discount || 0);
+      const remaining = totalAfterDiscount - parseFloat(paidAmount || 0);
+      
+      const updatedCustomer = {
+        ...customer,
+        discount: parseFloat(discount || 0),
+        paidAmount: parseFloat(paidAmount || 0),
+        remainingAmount: remaining
+      };
+
+      setCustomers(prev => prev.map(c => 
+        c.id === customer.id ? updatedCustomer : c
+      ));
+
+      // If fully paid, remove from customers and debts
+      if (remaining <= 0) {
+        setCustomers(prev => prev.filter(c => c.id !== customer.id));
+        setDebts(prev => prev.filter(debt => debt.customerId !== customer.id));
+        setSelectedCustomer(null);
+        alert('تم تسجيل الدفع وإغلاق الفاتورة بنجاح!');
+      } else {
+        // Add/update debt record
+        const debtRecord = {
+          id: customer.id,
+          customerId: customer.id,
+          customerName: customer.name,
+          type: 'cafe',
+          amount: remaining,
+          date: new Date()
+        };
+
+        setDebts(prev => {
+          const existingIndex = prev.findIndex(debt => debt.customerId === customer.id && debt.type === 'cafe');
+          if (existingIndex >= 0) {
+            const updated = [...prev];
+            updated[existingIndex] = debtRecord;
+            return updated;
+          } else {
+            return [...prev, debtRecord];
+          }
+        });
+
+        setSelectedCustomer(updatedCustomer);
+        alert(`تم تسجيل الدفع. الباقي على العميل: ${remaining.toFixed(2)} ${settings.currency}`);
+      }
+    };
+
+    // Delete customer (with password protection)
+    const deleteCustomer = (customerId) => {
+      setShowPasswordModal({
+        show: true,
+        action: 'delete_customer',
+        item: customerId
+      });
+    };
+
+    const handleCustomerPasswordAction = (enteredPassword) => {
+      if (enteredPassword !== settings.deletePassword) {
+        alert('كلمة المرور غير صحيحة!');
+        return;
+      }
+
+      if (showPasswordModal.action === 'delete_customer') {
+        setCustomers(prev => prev.filter(customer => customer.id !== showPasswordModal.item));
+        setDebts(prev => prev.filter(debt => debt.customerId !== showPasswordModal.item));
+        if (selectedCustomer && selectedCustomer.id === showPasswordModal.item) {
+          setSelectedCustomer(null);
+        }
+        alert('تم حذف العميل والفاتورة بنجاح!');
+      }
+
+      setShowPasswordModal({ show: false, action: '', item: null });
+    };
+
+    return (
+      <div className="bg-white/90 backdrop-blur-sm rounded-lg shadow-lg p-6 m-4">
+        <h2 className="text-2xl font-bold text-gray-800 mb-6 text-right">إدارة الكافيه</h2>
+        
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Right Panel - Customer Management */}
+          <div className="order-1 lg:order-2">
+            {/* Add New Customer */}
+            <div className="bg-green-50 rounded-lg p-4 mb-4">
+              <h3 className="text-lg font-semibold text-gray-700 mb-3 text-right">إضافة عميل جديد</h3>
+              <div className="flex gap-3">
+                <button
+                  onClick={addCustomer}
+                  className="px-4 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 whitespace-nowrap"
+                >
+                  ➕ إضافة عميل
+                </button>
+                <input
+                  type="text"
+                  value={newCustomerName}
+                  onChange={(e) => setNewCustomerName(e.target.value)}
+                  className="flex-1 p-2 border border-gray-300 rounded-md text-right"
+                  placeholder="اسم العميل"
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter') {
+                      addCustomer();
+                    }
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Customer Invoice Details */}
+            {selectedCustomer ? (
+              <div className="bg-white rounded-lg border shadow-sm">
+                <div className="px-4 py-3 bg-blue-50 border-b">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <button
+                        onClick={() => setSelectedCustomer(null)}
+                        className="px-3 py-1 bg-gray-500 text-white rounded text-sm hover:bg-gray-600"
+                      >
+                        ← العودة
+                      </button>
+                    </div>
+                    <h3 className="text-lg font-semibold text-gray-800">
+                      فاتورة العميل: {selectedCustomer.name}
+                    </h3>
+                  </div>
+                  {selectedCustomer.remainingAmount > 0 && (
+                    <div className="mt-2 text-right">
+                      <span className="text-red-600 font-semibold">
+                        باقي حساب سابق: {selectedCustomer.remainingAmount.toFixed(2)} {settings.currency}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Add Items Section */}
+                <div className="p-4 border-b bg-gray-50">
+                  <h4 className="font-semibold mb-3 text-right">إضافة أصناف</h4>
+                  {inventory.length === 0 ? (
+                    <p className="text-gray-500 text-center">لا توجد أصناف في المخزون</p>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                      {inventory.map(item => (
+                        <button
+                          key={item.id}
+                          onClick={() => addItemToInvoice(selectedCustomer.id, item.id)}
+                          className="p-3 bg-white border border-gray-300 rounded hover:bg-blue-50 text-right"
+                        >
+                          <div className="flex justify-between">
+                            <span className="text-green-600 font-semibold">
+                              {item.price.toFixed(2)} {settings.currency}
+                            </span>
+                            <span className="font-medium">{item.name}</span>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Invoice Items */}
+                <div className="p-4">
+                  <h4 className="font-semibold mb-3 text-right">الأصناف المضافة</h4>
+                  {selectedCustomer.invoice.length === 0 ? (
+                    <p className="text-gray-500 text-center py-4">لم يتم إضافة أي أصناف بعد</p>
+                  ) : (
+                    <>
+                      <div className="space-y-2 mb-4">
+                        {selectedCustomer.invoice.map(item => (
+                          <div key={item.id} className="flex justify-between items-center p-3 bg-gray-50 rounded">
+                            <button
+                              onClick={() => removeItemFromInvoice(selectedCustomer.id, item.id)}
+                              className="px-2 py-1 bg-red-500 text-white rounded text-sm hover:bg-red-600"
+                            >
+                              🗑️
+                            </button>
+                            <div className="text-right flex-1 mx-3">
+                              <div className="flex justify-between">
+                                <span className="font-semibold text-green-600">
+                                  {item.totalPrice.toFixed(2)} {settings.currency}
+                                </span>
+                                <span className="font-medium">{item.name}</span>
+                              </div>
+                              <div className="text-sm text-gray-600">
+                                الكمية: {item.quantity} × {item.price.toFixed(2)} {settings.currency}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Total and Payment */}
+                      <div className="border-t pt-4">
+                        <div className="text-center mb-4">
+                          <span className="text-xl font-bold text-blue-600">
+                            الإجمالي: {selectedCustomer.totalAmount.toFixed(2)} {settings.currency}
+                          </span>
+                        </div>
+
+                        <CustomerPaymentModal 
+                          customer={selectedCustomer}
+                          onPayment={calculateCustomerBill}
+                          currency={settings.currency}
+                        />
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-12 text-gray-500">
+                <div className="text-4xl mb-4">👤</div>
+                <p className="text-lg">اختر عميل لعرض فاتورته</p>
+                <p className="text-sm">أو أضف عميل جديد</p>
+              </div>
+            )}
+          </div>
+
+          {/* Left Panel - Customer List */}
+          <div className="order-2 lg:order-1">
+            <div className="bg-white rounded-lg border shadow-sm">
+              <div className="px-4 py-3 bg-gray-50 border-b">
+                <h3 className="text-lg font-semibold text-gray-800 text-right">قائمة الفواتير</h3>
+              </div>
+              
+              {customers.length === 0 ? (
+                <div className="text-center py-12 text-gray-500">
+                  <div className="text-4xl mb-4">📋</div>
+                  <p className="text-lg">لا توجد فواتير</p>
+                  <p className="text-sm">أضف عميل جديد لبدء فاتورة</p>
+                </div>
+              ) : (
+                <div className="divide-y">
+                  {customers.map(customer => (
+                    <div key={customer.id} className="p-4">
+                      <div className="flex justify-between items-center">
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => deleteCustomer(customer.id)}
+                            className="px-2 py-1 bg-red-500 text-white rounded text-xs hover:bg-red-600"
+                          >
+                            🗑️
+                          </button>
+                          <button
+                            onClick={() => setSelectedCustomer(customer)}
+                            className="px-3 py-1 bg-blue-500 text-white rounded text-xs hover:bg-blue-600"
+                          >
+                            ✏️ تعديل
+                          </button>
+                        </div>
+                        <div className="text-right cursor-pointer flex-1" onClick={() => setSelectedCustomer(customer)}>
+                          <div className="font-semibold text-gray-800">{customer.name}</div>
+                          <div className="text-sm text-gray-600">
+                            الإجمالي: {customer.totalAmount.toFixed(2)} {settings.currency}
+                          </div>
+                          {customer.remainingAmount > 0 && (
+                            <div className="text-sm text-red-600 font-semibold">
+                              الباقي: {customer.remainingAmount.toFixed(2)} {settings.currency}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Password Modal for Customer Actions */}
+        {showPasswordModal.show && showPasswordModal.action === 'delete_customer' && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 w-96">
+              <h3 className="text-lg font-bold text-center mb-4">🔒 تأكيد حذف العميل</h3>
+              
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2 text-right">كلمة المرور</label>
+                <input
+                  type="password"
+                  id="customerPasswordInput"
+                  className="w-full p-3 border border-gray-300 rounded-md text-right"
+                  placeholder="أدخل كلمة المرور"
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter') {
+                      const password = e.target.value;
+                      handleCustomerPasswordAction(password);
+                      e.target.value = '';
+                    }
+                  }}
+                />
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    const password = document.getElementById('customerPasswordInput').value;
+                    handleCustomerPasswordAction(password);
+                    document.getElementById('customerPasswordInput').value = '';
+                  }}
+                  className="flex-1 py-2 bg-red-500 text-white rounded-md hover:bg-red-600"
+                >
+                  ✅ تأكيد الحذف
+                </button>
+                <button
+                  onClick={() => setShowPasswordModal({ show: false, action: '', item: null })}
+                  className="flex-1 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
+                >
+                  إلغاء
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
-    </div>
-  );
+    );
+  };
+
+  // Customer Payment Modal Component
+  const CustomerPaymentModal = ({ customer, onPayment, currency }) => {
+    const [showPaymentModal, setShowPaymentModal] = useState(false);
+    const [discount, setDiscount] = useState('');
+    const [paidAmount, setPaidAmount] = useState('');
+
+    const handlePayment = () => {
+      if (!paidAmount) {
+        alert('يرجى إدخال المبلغ المدفوع');
+        return;
+      }
+
+      onPayment(customer, discount, paidAmount);
+      setShowPaymentModal(false);
+      setDiscount('');
+      setPaidAmount('');
+    };
+
+    const totalAfterDiscount = customer.totalAmount - parseFloat(discount || 0);
+    const remaining = totalAfterDiscount - parseFloat(paidAmount || 0);
+
+    return (
+      <>
+        <button
+          onClick={() => setShowPaymentModal(true)}
+          disabled={customer.totalAmount <= 0}
+          className="w-full py-3 bg-green-500 text-white rounded-md hover:bg-green-600 disabled:bg-gray-400 disabled:cursor-not-allowed font-semibold"
+        >
+          💰 حساب العميل
+        </button>
+
+        {showPaymentModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 w-96">
+              <h3 className="text-lg font-bold text-center mb-4">💰 حساب العميل - {customer.name}</h3>
+              
+              <div className="mb-4 text-center">
+                <span className="text-xl font-bold text-blue-600">
+                  الإجمالي: {customer.totalAmount.toFixed(2)} {currency}
+                </span>
+              </div>
+
+              <div className="mb-3">
+                <label className="block text-sm font-medium text-gray-700 mb-1 text-right">الخصم ({currency})</label>
+                <input
+                  type="number"
+                  value={discount}
+                  onChange={(e) => setDiscount(e.target.value)}
+                  className="w-full p-2 border border-gray-300 rounded-md text-right"
+                  placeholder="0"
+                />
+              </div>
+
+              <div className="mb-3">
+                <label className="block text-sm font-medium text-gray-700 mb-1 text-right">العميل دفع ({currency})</label>
+                <input
+                  type="number"
+                  value={paidAmount}
+                  onChange={(e) => setPaidAmount(e.target.value)}
+                  className="w-full p-2 border border-gray-300 rounded-md text-right"
+                  placeholder="0"
+                />
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1 text-right">الباقي</label>
+                <div className="w-full p-2 bg-gray-100 border border-gray-300 rounded-md text-right">
+                  <span className={`font-semibold ${remaining < 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {remaining.toFixed(2)} {currency}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={handlePayment}
+                  className="flex-1 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 font-semibold"
+                >
+                  ✅ تأكيد الدفع
+                </button>
+                <button
+                  onClick={() => setShowPaymentModal(false)}
+                  className="flex-1 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
+                >
+                  إلغاء
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </>
+    );
+  };
 
   const InventoryPage = () => {
     
