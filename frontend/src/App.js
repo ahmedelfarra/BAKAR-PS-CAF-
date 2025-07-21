@@ -1180,15 +1180,355 @@ const App = () => {
     );
   };
 
-  const WithdrawalsPage = () => (
-    <div className="bg-white/90 backdrop-blur-sm rounded-lg shadow-lg p-6 m-4">
-      <h2 className="text-2xl font-bold text-gray-800 mb-4 text-right">السحوبات والمصاريف</h2>
-      <div className="text-center text-gray-600 py-12">
-        <div className="text-6xl mb-4">💰</div>
-        <p className="text-xl">جاري تحضير واجهة السحوبات...</p>
+  const WithdrawalsPage = () => {
+    
+    // Withdrawals state
+    const [withdrawalAmount, setWithdrawalAmount] = useState('');
+    const [withdrawalDescription, setWithdrawalDescription] = useState('');
+    const [withdrawalType, setWithdrawalType] = useState('');
+    const [withdrawals, setWithdrawals] = useState([]);
+    const [withdrawalDebts, setWithdrawalDebts] = useState([]); // شكك السحوبات
+
+    const withdrawalTypes = [
+      { value: 'debt', label: 'مديونية' },
+      { value: 'collection', label: 'قبض' },
+      { value: 'advance', label: 'سلفة' },
+      { value: 'other', label: 'آخر' }
+    ];
+
+    // Add withdrawal entry
+    const addWithdrawal = () => {
+      if (!withdrawalAmount || !withdrawalType) {
+        alert('يرجى إدخال المبلغ ونوع العملية');
+        return;
+      }
+
+      const newWithdrawal = {
+        id: Date.now().toString(),
+        amount: parseFloat(withdrawalAmount),
+        description: withdrawalDescription.trim(),
+        type: withdrawalType,
+        date: new Date(),
+        createdAt: Date.now()
+      };
+
+      setWithdrawals(prev => [...prev, newWithdrawal]);
+
+      // If it's an advance (سلفة), add to debts
+      if (withdrawalType === 'advance') {
+        const debtRecord = {
+          id: newWithdrawal.id,
+          customerId: newWithdrawal.id,
+          customerName: withdrawalDescription.trim() || `سلفة ${newWithdrawal.id}`,
+          type: 'withdrawal',
+          amount: parseFloat(withdrawalAmount),
+          date: new Date()
+        };
+
+        setWithdrawalDebts(prev => [...prev, debtRecord]);
+      }
+
+      // Reset form
+      setWithdrawalAmount('');
+      setWithdrawalDescription('');
+      setWithdrawalType('');
+      
+      alert('تم إضافة العملية بنجاح!');
+    };
+
+    // Pay withdrawal debt
+    const payWithdrawalDebt = (debtId, paidAmount) => {
+      setWithdrawalDebts(prev => prev.map(debt => {
+        if (debt.id === debtId) {
+          const remaining = debt.amount - parseFloat(paidAmount || 0);
+          if (remaining <= 0) {
+            return null; // Will be filtered out
+          }
+          return { ...debt, amount: remaining };
+        }
+        return debt;
+      }).filter(debt => debt !== null));
+    };
+
+    return (
+      <div className="bg-white/90 backdrop-blur-sm rounded-lg shadow-lg p-6 m-4">
+        <h2 className="text-2xl font-bold text-gray-800 mb-6 text-right">السحوبات والمصاريف</h2>
+        
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Add Withdrawal Section */}
+          <div className="bg-orange-50 rounded-lg p-6">
+            <h3 className="text-lg font-semibold text-gray-700 mb-4 text-right">إضافة عملية جديدة</h3>
+            
+            {/* Amount and Type Fields */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2 text-right">المبلغ ({settings.currency})</label>
+                <input
+                  type="number"
+                  step="0.1"
+                  value={withdrawalAmount}
+                  onChange={(e) => setWithdrawalAmount(e.target.value)}
+                  className="w-full p-3 border border-gray-300 rounded-md text-right"
+                  placeholder="أدخل المبلغ"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2 text-right">نوع العملية</label>
+                <select
+                  value={withdrawalType}
+                  onChange={(e) => setWithdrawalType(e.target.value)}
+                  className="w-full p-3 border border-gray-300 rounded-md text-right"
+                >
+                  <option value="">اختر نوع العملية</option>
+                  {withdrawalTypes.map(type => (
+                    <option key={type.value} value={type.value}>{type.label}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Description Field */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2 text-right">
+                البيان {withdrawalType === 'advance' && '(اسم الشخص)'}
+              </label>
+              <input
+                type="text"
+                value={withdrawalDescription}
+                onChange={(e) => setWithdrawalDescription(e.target.value)}
+                className="w-full p-3 border border-gray-300 rounded-md text-right"
+                placeholder={withdrawalType === 'advance' ? "أدخل اسم الشخص" : "أدخل البيان"}
+              />
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex gap-3">
+              <button
+                onClick={addWithdrawal}
+                className="flex-1 py-3 bg-orange-500 text-white rounded-md hover:bg-orange-600 font-semibold"
+              >
+                ➕ إضافة
+              </button>
+              <button
+                onClick={addWithdrawal}
+                className="px-6 py-3 bg-green-500 text-white rounded-md hover:bg-green-600 font-semibold"
+              >
+                ✅ OK
+              </button>
+            </div>
+
+            {withdrawalType === 'advance' && (
+              <div className="mt-3 p-3 bg-yellow-100 rounded-md">
+                <p className="text-sm text-yellow-800 text-right">
+                  ⚠️ هذه سلفة وستضاف إلى قائمة الشكك
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Withdrawals History */}
+          <div className="bg-white rounded-lg border shadow-sm">
+            <div className="px-4 py-3 bg-gray-50 border-b">
+              <h3 className="text-lg font-semibold text-gray-800 text-right">سجل العمليات اليومية</h3>
+            </div>
+            
+            {withdrawals.length === 0 ? (
+              <div className="text-center py-12 text-gray-500">
+                <div className="text-4xl mb-4">💰</div>
+                <p className="text-lg">لا توجد عمليات اليوم</p>
+              </div>
+            ) : (
+              <div className="max-h-96 overflow-y-auto">
+                {withdrawals.map((withdrawal) => (
+                  <div key={withdrawal.id} className="p-4 border-b hover:bg-gray-50">
+                    <div className="flex justify-between items-start">
+                      <div className="text-right flex-1">
+                        <div className="font-semibold text-gray-800">
+                          {withdrawalTypes.find(type => type.value === withdrawal.type)?.label}
+                        </div>
+                        <div className="text-sm text-gray-600">{withdrawal.description}</div>
+                        <div className="text-xs text-gray-500">
+                          {withdrawal.date.toLocaleString('ar-EG')}
+                        </div>
+                      </div>
+                      <div className="text-left">
+                        <span className={`font-bold text-lg ${
+                          withdrawal.type === 'collection' ? 'text-green-600' : 'text-red-600'
+                        }`}>
+                          {withdrawal.type === 'collection' ? '+' : '-'}{withdrawal.amount.toFixed(2)} {settings.currency}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Withdrawal Debts Section */}
+        {withdrawalDebts.length > 0 && (
+          <div className="mt-6 bg-red-50 rounded-lg p-4">
+            <h3 className="text-lg font-semibold text-gray-700 mb-4 text-right">
+              🧾 شكك السحوبات ({withdrawalDebts.length})
+            </h3>
+            
+            <div className="space-y-3">
+              {withdrawalDebts.map(debt => (
+                <WithdrawalDebtItem
+                  key={debt.id}
+                  debt={debt}
+                  onPayment={payWithdrawalDebt}
+                  currency={settings.currency}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Daily Summary */}
+        <div className="mt-6 bg-blue-50 rounded-lg p-4">
+          <h3 className="text-lg font-semibold text-gray-700 mb-3 text-right">ملخص اليوم</h3>
+          
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+            <div className="bg-green-100 p-3 rounded">
+              <div className="text-sm text-gray-600">إجمالي القبض</div>
+              <div className="text-lg font-bold text-green-600">
+                +{withdrawals.filter(w => w.type === 'collection').reduce((sum, w) => sum + w.amount, 0).toFixed(2)} {settings.currency}
+              </div>
+            </div>
+            
+            <div className="bg-red-100 p-3 rounded">
+              <div className="text-sm text-gray-600">إجمالي المصاريف</div>
+              <div className="text-lg font-bold text-red-600">
+                -{withdrawals.filter(w => w.type !== 'collection').reduce((sum, w) => sum + w.amount, 0).toFixed(2)} {settings.currency}
+              </div>
+            </div>
+            
+            <div className="bg-yellow-100 p-3 rounded">
+              <div className="text-sm text-gray-600">السلف المعلقة</div>
+              <div className="text-lg font-bold text-yellow-600">
+                {withdrawalDebts.reduce((sum, debt) => sum + debt.amount, 0).toFixed(2)} {settings.currency}
+              </div>
+            </div>
+            
+            <div className="bg-blue-100 p-3 rounded">
+              <div className="text-sm text-gray-600">صافي الحركة</div>
+              <div className="text-lg font-bold text-blue-600">
+                {(
+                  withdrawals.filter(w => w.type === 'collection').reduce((sum, w) => sum + w.amount, 0) -
+                  withdrawals.filter(w => w.type !== 'collection').reduce((sum, w) => sum + w.amount, 0)
+                ).toFixed(2)} {settings.currency}
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
+
+  // Withdrawal Debt Item Component
+  const WithdrawalDebtItem = ({ debt, onPayment, currency }) => {
+    const [showPaymentModal, setShowPaymentModal] = useState(false);
+    const [paidAmount, setPaidAmount] = useState('');
+
+    const handlePayment = () => {
+      if (!paidAmount || parseFloat(paidAmount) <= 0) {
+        alert('يرجى إدخال مبلغ صحيح');
+        return;
+      }
+
+      onPayment(debt.id, paidAmount);
+      setShowPaymentModal(false);
+      setPaidAmount('');
+      
+      const remaining = debt.amount - parseFloat(paidAmount);
+      if (remaining <= 0) {
+        alert('تم تسديد السلفة بالكامل!');
+      } else {
+        alert(`تم تسجيل الدفع. الباقي: ${remaining.toFixed(2)} ${currency}`);
+      }
+    };
+
+    return (
+      <>
+        <div className="bg-white p-4 rounded border flex justify-between items-center">
+          <button
+            onClick={() => setShowPaymentModal(true)}
+            className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 text-sm"
+          >
+            💰 دفع
+          </button>
+          
+          <div className="text-right flex-1 mx-4">
+            <div className="font-semibold text-gray-800">{debt.customerName}</div>
+            <div className="text-sm text-gray-600">
+              المبلغ المستحق: <span className="font-semibold text-red-600">{debt.amount.toFixed(2)} {currency}</span>
+            </div>
+            <div className="text-xs text-gray-500">
+              {debt.date.toLocaleDateString('ar-EG')}
+            </div>
+          </div>
+        </div>
+
+        {showPaymentModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 w-96">
+              <h3 className="text-lg font-bold text-center mb-4">
+                💰 دفع سلفة - {debt.customerName}
+              </h3>
+              
+              <div className="mb-4 text-center">
+                <span className="text-xl font-bold text-red-600">
+                  المستحق: {debt.amount.toFixed(2)} {currency}
+                </span>
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2 text-right">المبلغ المدفوع ({currency})</label>
+                <input
+                  type="number"
+                  value={paidAmount}
+                  onChange={(e) => setPaidAmount(e.target.value)}
+                  className="w-full p-3 border border-gray-300 rounded-md text-right"
+                  placeholder="أدخل المبلغ المدفوع"
+                />
+              </div>
+
+              {paidAmount && (
+                <div className="mb-4 text-center">
+                  <span className={`font-semibold ${
+                    (debt.amount - parseFloat(paidAmount || 0)) < 0 ? 'text-green-600' : 'text-red-600'
+                  }`}>
+                    الباقي: {(debt.amount - parseFloat(paidAmount || 0)).toFixed(2)} {currency}
+                  </span>
+                </div>
+              )}
+
+              <div className="flex gap-3">
+                <button
+                  onClick={handlePayment}
+                  className="flex-1 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 font-semibold"
+                >
+                  ✅ تأكيد الدفع
+                </button>
+                <button
+                  onClick={() => {
+                    setShowPaymentModal(false);
+                    setPaidAmount('');
+                  }}
+                  className="flex-1 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
+                >
+                  إلغاء
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </>
+    );
+  };
 
   const SettingsPage = () => (
     <div className="bg-white/90 backdrop-blur-sm rounded-lg shadow-lg p-6 m-4">
