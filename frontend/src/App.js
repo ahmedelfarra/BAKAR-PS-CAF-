@@ -1530,15 +1530,270 @@ const App = () => {
     );
   };
 
-  const SettingsPage = () => (
-    <div className="bg-white/90 backdrop-blur-sm rounded-lg shadow-lg p-6 m-4">
-      <h2 className="text-2xl font-bold text-gray-800 mb-4 text-right">الإعدادات</h2>
-      <div className="text-center text-gray-600 py-12">
-        <div className="text-6xl mb-4">⚙️</div>
-        <p className="text-xl">جاري تحضير واجهة الإعدادات...</p>
+  const SettingsPage = () => {
+    const [showPasswordModal, setShowPasswordModal] = useState({ show: false, action: '' });
+    const [oldPassword, setOldPassword] = useState('');
+    const [newPassword, setNewPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+    const [drawerAmount, setDrawerAmount] = useState('');
+
+    // Change password
+    const changePassword = () => {
+      if (oldPassword !== settings.deletePassword) {
+        alert('كلمة المرور القديمة غير صحيحة!');
+        return;
+      }
+
+      if (newPassword !== confirmPassword) {
+        alert('كلمة المرور الجديدة غير متطابقة!');
+        return;
+      }
+
+      if (newPassword.length < 4) {
+        alert('كلمة المرور يجب أن تكون 4 أرقام على الأقل!');
+        return;
+      }
+
+      setSettings(prev => ({ ...prev, deletePassword: newPassword }));
+      setShowPasswordModal({ show: false, action: '' });
+      setOldPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      alert('تم تغيير كلمة المرور بنجاح!');
+    };
+
+    // Calculate daily totals
+    const calculateDailySummary = () => {
+      // Device earnings (completed sessions)
+      const deviceEarnings = Object.values(devices).reduce((total, device) => {
+        return device.canCalculate ? total + device.totalCost : total;
+      }, 0);
+
+      // Cafe earnings (paid customers)
+      const cafeEarnings = customers.reduce((total, customer) => {
+        return total + customer.paidAmount;
+      }, 0);
+
+      // Withdrawals
+      const totalWithdrawals = withdrawals.filter(w => w.type !== 'collection').reduce((sum, w) => sum + w.amount, 0);
+      const totalCollections = withdrawals.filter(w => w.type === 'collection').reduce((sum, w) => sum + w.amount, 0);
+
+      // Total in drawer
+      const expectedDrawerAmount = deviceEarnings + cafeEarnings + totalCollections - totalWithdrawals;
+
+      return {
+        deviceEarnings,
+        cafeEarnings,
+        totalWithdrawals,
+        totalCollections,
+        expectedDrawerAmount,
+        totalDebts: debts.reduce((sum, debt) => sum + debt.amount, 0) + withdrawalDebts.reduce((sum, debt) => sum + debt.amount, 0)
+      };
+    };
+
+    const summary = calculateDailySummary();
+
+    // Generate PDF Report
+    const generatePDFReport = () => {
+      const reportData = {
+        date: new Date().toLocaleDateString('ar-EG'),
+        summary,
+        devices: Object.values(devices),
+        customers,
+        withdrawals,
+        debts,
+        withdrawalDebts
+      };
+
+      // Here you would generate the PDF
+      alert('سيتم تصدير التقرير قريباً...');
+      console.log('Report Data:', reportData);
+    };
+
+    return (
+      <div className="bg-white/90 backdrop-blur-sm rounded-lg shadow-lg p-6 m-4">
+        <h2 className="text-2xl font-bold text-gray-800 mb-6 text-right">الإعدادات</h2>
+        
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Daily Summary */}
+          <div className="bg-blue-50 rounded-lg p-6">
+            <h3 className="text-lg font-semibold text-gray-700 mb-4 text-right">تقفيل اليومية</h3>
+            
+            <div className="space-y-4 mb-6">
+              <div className="flex justify-between items-center p-3 bg-white rounded border">
+                <span className="font-semibold text-green-600">+{summary.deviceEarnings.toFixed(2)} {settings.currency}</span>
+                <span>إيرادات الأجهزة</span>
+              </div>
+              
+              <div className="flex justify-between items-center p-3 bg-white rounded border">
+                <span className="font-semibold text-green-600">+{summary.cafeEarnings.toFixed(2)} {settings.currency}</span>
+                <span>إيرادات الكافيه</span>
+              </div>
+              
+              <div className="flex justify-between items-center p-3 bg-white rounded border">
+                <span className="font-semibold text-green-600">+{summary.totalCollections.toFixed(2)} {settings.currency}</span>
+                <span>إجمالي القبض</span>
+              </div>
+              
+              <div className="flex justify-between items-center p-3 bg-white rounded border">
+                <span className="font-semibold text-red-600">-{summary.totalWithdrawals.toFixed(2)} {settings.currency}</span>
+                <span>إجمالي المصاريف</span>
+              </div>
+              
+              <div className="flex justify-between items-center p-3 bg-yellow-100 rounded border border-yellow-300">
+                <span className="font-semibold text-yellow-600">{summary.totalDebts.toFixed(2)} {settings.currency}</span>
+                <span>إجمالي الشكك</span>
+              </div>
+              
+              <div className="flex justify-between items-center p-4 bg-blue-100 rounded border-2 border-blue-300">
+                <span className="font-bold text-blue-600 text-xl">{summary.expectedDrawerAmount.toFixed(2)} {settings.currency}</span>
+                <span className="font-semibold">المفروض في الدرج</span>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <button
+                onClick={generatePDFReport}
+                className="w-full py-3 bg-blue-500 text-white rounded-md hover:bg-blue-600 font-semibold"
+              >
+                📄 تصدير التقرير PDF
+              </button>
+              
+              <button
+                onClick={() => alert('سيتم عمل نسخة احتياطية قريباً...')}
+                className="w-full py-3 bg-green-500 text-white rounded-md hover:bg-green-600 font-semibold"
+              >
+                💾 نسخ احتياطي
+              </button>
+            </div>
+          </div>
+
+          {/* Settings & Debts */}
+          <div className="space-y-6">
+            {/* Password Settings */}
+            <div className="bg-red-50 rounded-lg p-6">
+              <h3 className="text-lg font-semibold text-gray-700 mb-4 text-right">إعدادات الأمان</h3>
+              
+              <button
+                onClick={() => setShowPasswordModal({ show: true, action: 'change_password' })}
+                className="w-full py-3 bg-red-500 text-white rounded-md hover:bg-red-600 font-semibold"
+              >
+                🔒 تغيير كلمة المرور
+              </button>
+              
+              <p className="text-sm text-gray-600 mt-2 text-right">
+                كلمة المرور الحالية: ****
+              </p>
+            </div>
+
+            {/* Combined Debts List */}
+            <div className="bg-yellow-50 rounded-lg p-6">
+              <h3 className="text-lg font-semibold text-gray-700 mb-4 text-right">
+                📋 قائمة الشكك الموحدة ({debts.length + withdrawalDebts.length})
+              </h3>
+              
+              {(debts.length + withdrawalDebts.length) === 0 ? (
+                <p className="text-center py-4 text-gray-500">لا توجد شكك معلقة</p>
+              ) : (
+                <div className="max-h-64 overflow-y-auto space-y-2">
+                  {/* Cafe Debts */}
+                  {debts.map(debt => (
+                    <div key={debt.id} className="bg-white p-3 rounded border flex justify-between items-center">
+                      <div className="text-right flex-1">
+                        <div className="font-semibold text-gray-800">{debt.customerName}</div>
+                        <div className="text-sm text-blue-600">كافيه</div>
+                        <div className="text-sm text-red-600 font-semibold">
+                          {debt.amount.toFixed(2)} {settings.currency}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  
+                  {/* Device Debts (if any) */}
+                  {/* Withdrawal Debts */}
+                  {withdrawalDebts.map(debt => (
+                    <div key={debt.id} className="bg-white p-3 rounded border flex justify-between items-center">
+                      <div className="text-right flex-1">
+                        <div className="font-semibold text-gray-800">{debt.customerName}</div>
+                        <div className="text-sm text-orange-600">سلفة</div>
+                        <div className="text-sm text-red-600 font-semibold">
+                          {debt.amount.toFixed(2)} {settings.currency}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Password Change Modal */}
+        {showPasswordModal.show && showPasswordModal.action === 'change_password' && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 w-96">
+              <h3 className="text-lg font-bold text-center mb-4">🔒 تغيير كلمة المرور</h3>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2 text-right">كلمة المرور القديمة</label>
+                  <input
+                    type="password"
+                    value={oldPassword}
+                    onChange={(e) => setOldPassword(e.target.value)}
+                    className="w-full p-3 border border-gray-300 rounded-md text-right"
+                    placeholder="أدخل كلمة المرور القديمة"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2 text-right">كلمة المرور الجديدة</label>
+                  <input
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className="w-full p-3 border border-gray-300 rounded-md text-right"
+                    placeholder="أدخل كلمة المرور الجديدة"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2 text-right">تأكيد كلمة المرور الجديدة</label>
+                  <input
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="w-full p-3 border border-gray-300 rounded-md text-right"
+                    placeholder="أعد إدخال كلمة المرور الجديدة"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={changePassword}
+                  className="flex-1 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 font-semibold"
+                >
+                  ✅ تأكيد التغيير
+                </button>
+                <button
+                  onClick={() => {
+                    setShowPasswordModal({ show: false, action: '' });
+                    setOldPassword('');
+                    setNewPassword('');
+                    setConfirmPassword('');
+                  }}
+                  className="flex-1 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600"
+                >
+                  إلغاء
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
-    </div>
-  );
+    );
+  };
 
   const renderCurrentPage = () => {
     switch (activeTab) {
