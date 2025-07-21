@@ -1583,23 +1583,26 @@ const App = () => {
         </div>
       </header>
 
-      {/* Navigation */}
+      {/* Navigation Switches */}
       <nav className="bg-white/5 backdrop-blur-md border-b border-white/10 sticky top-[120px] z-30">
         <div className="max-w-7xl mx-auto px-4">
-          <div className="flex flex-wrap justify-center space-x-1 py-3">
+          <div className="flex flex-wrap justify-center space-x-2 py-4">
             {tabs.map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`px-4 py-2 mx-1 my-1 rounded-full font-semibold text-sm transition-all duration-300 ${
-                  activeTab === tab.id
-                    ? 'bg-white text-purple-900 shadow-lg scale-105'
-                    : 'bg-white/10 text-white hover:bg-white/20 hover:scale-102'
-                }`}
-              >
-                <span className="ml-2">{tab.icon}</span>
-                {tab.name}
-              </button>
+              <label key={tab.id} className="relative inline-flex items-center cursor-pointer mx-2 my-1">
+                <input
+                  type="radio"
+                  name="activeTab"
+                  checked={activeTab === tab.id}
+                  onChange={() => setActiveTab(tab.id)}
+                  className="sr-only peer"
+                />
+                <div className="w-12 h-6 bg-gray-600 rounded-full peer-checked:bg-blue-500 peer-focus:ring-2 peer-focus:ring-blue-300 transition-all duration-300"></div>
+                <div className="absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform duration-300 peer-checked:translate-x-6"></div>
+                <span className="mr-3 text-white font-medium text-sm flex items-center">
+                  <span className="ml-2">{tab.icon}</span>
+                  {tab.name}
+                </span>
+              </label>
             ))}
           </div>
         </div>
